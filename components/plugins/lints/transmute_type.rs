@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use rustc::lint::{Context, LintPass, LintArray};
-use syntax::ast;
+use rustc_front::hir;
 use syntax::attr::AttrMetaMethods;
 
 declare_lint!(TRANSMUTE_TYPE_LINT, Allow,
@@ -20,11 +20,11 @@ impl LintPass for TransmutePass {
         lint_array!(TRANSMUTE_TYPE_LINT)
     }
 
-    fn check_expr(&mut self, cx: &Context, ex: &ast::Expr) {
+    fn check_expr(&mut self, cx: &Context, ex: &hir::Expr) {
         match ex.node {
-            ast::ExprCall(ref expr, ref args) => {
+            hir::ExprCall(ref expr, ref args) => {
                 match expr.node {
-                    ast::ExprPath(_, ref path) => {
+                    hir::ExprPath(_, ref path) => {
                         if path.segments.last()
                                         .map_or(false, |ref segment| segment.identifier.name.as_str() == "transmute")
                            && args.len() == 1 {

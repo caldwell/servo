@@ -5,6 +5,7 @@
 use rustc::lint::{Context, LintPass, LintArray, Level};
 use rustc::middle::def;
 use rustc::middle::def_id::DefId;
+use rustc_front::hir;
 use syntax::ast;
 
 use utils::match_lang_ty;
@@ -23,8 +24,8 @@ impl LintPass for InheritancePass {
         lint_array!(INHERITANCE_INTEGRITY)
     }
 
-    fn check_struct_def(&mut self, cx: &Context, def: &ast::StructDef, _i: ast::Ident,
-                        _gen: &ast::Generics, id: ast::NodeId) {
+    fn check_struct_def(&mut self, cx: &Context, def: &hir::StructDef, _i: ast::Ident,
+                        _gen: &hir::Generics, id: ast::NodeId) {
         // Lints are run post expansion, so it's fine to use
         // #[_dom_struct_marker] here without also checking for #[dom_struct]
         if cx.tcx.has_attr(DefId::local(id), "_dom_struct_marker") {
@@ -44,7 +45,7 @@ impl LintPass for InheritancePass {
                                     .map(|(_, f)| f.span);
             // Find all #[dom_struct] fields
             let dom_spans: Vec<_> = def.fields.iter().enumerate().filter_map(|(ctr, f)| {
-                if let ast::TyPath(..) = f.node.ty.node {
+                if let hir::TyPath(..) = f.node.ty.node {
                     if let Some(&def::PathResolution { base_def: def::DefTy(def_id, _), .. }) =
                             cx.tcx.def_map.borrow().get(&f.node.ty.id) {
                         if cx.tcx.has_attr(def_id, "_dom_struct_marker") {

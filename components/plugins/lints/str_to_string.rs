@@ -4,7 +4,7 @@
 
 use rustc::lint::{Context, LintPass, LintArray};
 use rustc::middle::ty;
-use syntax::ast;
+use rustc_front::hir;
 
 declare_lint!(STR_TO_STRING, Deny,
               "Warn when a String could use to_owned() instead of to_string()");
@@ -19,9 +19,9 @@ impl LintPass for StrToStringPass {
         lint_array!(STR_TO_STRING)
     }
 
-    fn check_expr(&mut self, cx: &Context, expr: &ast::Expr) {
+    fn check_expr(&mut self, cx: &Context, expr: &hir::Expr) {
         match expr.node {
-            ast::ExprMethodCall(ref method, _, ref args)
+            hir::ExprMethodCall(ref method, _, ref args)
                 if method.node.name.as_str() == "to_string"
                 && is_str(cx, &*args[0]) => {
                 cx.span_lint(STR_TO_STRING, expr.span,
@@ -30,7 +30,7 @@ impl LintPass for StrToStringPass {
             _ => ()
         }
 
-        fn is_str(cx: &Context, expr: &ast::Expr) -> bool {
+        fn is_str(cx: &Context, expr: &hir::Expr) -> bool {
             fn walk_ty<'t>(ty: ty::Ty<'t>) -> ty::Ty<'t> {
                 match ty.sty {
                     ty::TyRef(_, ref tm) | ty::TyRawPtr(ref tm) => walk_ty(tm.ty),

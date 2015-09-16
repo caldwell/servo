@@ -2,30 +2,56 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use rustc::ast_map;
+use rustc::front::map as ast_map;
 use rustc::lint::Context;
 use rustc::middle::def;
 use rustc::middle::def_id::DefId;
+use rustc_front::hir;
 
 use syntax::ast;
-use syntax::ast::{TyPath, Path, AngleBracketedParameters, PathSegment, Ty};
-use syntax::attr::mark_used;
+//use syntax::ast::{TyPath, Path, AngleBracketedParameters, PathSegment};
+// use syntax::attr::mark_used;
+use rustc_front::attr::mark_used;
 use syntax::ptr::P;
 
 
 /// Matches a type with a provided string, and returns its type parameters if successful
 ///
 /// Try not to use this for types defined in crates you own, use match_lang_ty instead (for lint passes)
-pub fn match_ty_unwrap<'a>(ty: &'a Ty, segments: &[&str]) -> Option<&'a [P<Ty>]> {
+pub fn match_ty_unwrap<'a>(ty: &'a ast::Ty, segments: &[&str]) -> Option<&'a [P<ast::Ty>]> {
     match ty.node {
-        TyPath(_, Path { segments: ref seg, .. }) => {
+        ast::TyPath(_, ast::Path { segments: ref seg, .. }) => {
             // So ast::Path isn't the full path, just the tokens that were provided.
             // I could muck around with the maps and find the full path
             // however the more efficient way is to simply reverse the iterators and zip them
             // which will compare them in reverse until one of them runs out of segments
             if seg.iter().rev().zip(segments.iter().rev()).all(|(a, b)| a.identifier.name.as_str() == *b) {
                 match seg.last() {
-                    Some(&PathSegment { parameters: AngleBracketedParameters(ref a), .. }) => {
+                    Some(&ast::PathSegment { parameters: ast::AngleBracketedParameters(ref a), .. }) => {
+                        Some(&a.types)
+                    }
+                    _ => None
+                }
+            } else {
+                None
+            }
+        },
+        _ => None
+    }
+}
+/// Matches a type with a provided string, and returns its type parameters if successful
+///
+/// Try not to use this for types defined in crates you own, use match_lang_ty instead (for lint passes)
+pub fn match_hir_ty_unwrap<'a>(ty: &'a hir::Ty, segments: &[&str]) -> Option<&'a [P<hir::Ty>]> {
+    match ty.node {
+        hir::TyPath(_, hir::Path { segments: ref seg, .. }) => {
+            // So ast::Path isn't the full path, just the tokens that were provided.
+            // I could muck around with the maps and find the full path
+            // however the more efficient way is to simply reverse the iterators and zip them
+            // which will compare them in reverse until one of them runs out of segments
+            if seg.iter().rev().zip(segments.iter().rev()).all(|(a, b)| a.identifier.name.as_str() == *b) {
+                match seg.last() {
+                    Some(&hir::PathSegment { parameters: hir::AngleBracketedParameters(ref a), .. }) => {
                         Some(&a.types)
                     }
                     _ => None
@@ -39,9 +65,9 @@ pub fn match_ty_unwrap<'a>(ty: &'a Ty, segments: &[&str]) -> Option<&'a [P<Ty>]>
 }
 
 /// Checks if a type has a #[servo_lang = "str"] attribute
-pub fn match_lang_ty(cx: &Context, ty: &Ty, value: &str) -> bool {
+pub fn match_lang_ty(cx: &Context, ty: &hir::Ty, value: &str) -> bool {
     match ty.node {
-        TyPath(..) => {},
+        hir::TyPath(..) => {},
         _ => return false,
     }
 
@@ -56,9 +82,9 @@ pub fn match_lang_ty(cx: &Context, ty: &Ty, value: &str) -> bool {
 pub fn match_lang_did(cx: &Context, did: DefId, value: &str) -> bool {
     cx.tcx.get_attrs(did).iter().any(|attr| {
         match attr.node.value.node {
-            ast::MetaNameValue(ref name, ref val) if &**name == "servo_lang" => {
+            hir::MetaNameValue(ref name, ref val) if &**name == "servo_lang" => {
                 match val.node {
-                    ast::LitStr(ref v, _) if &**v == value => {
+                    hir::LitStr(ref v, _) if &**v == value => {
                         mark_used(attr);
                         true
                     },
@@ -76,14 +102,14 @@ pub fn unsafe_context(map: &ast_map::Map, id: ast::NodeId) -> bool {
     match map.find(map.get_parent(id)) {
         Some(ast_map::NodeImplItem(itm)) => {
             match itm.node {
-                ast::MethodImplItem(ref sig, _) => sig.unsafety == ast::Unsafety::Unsafe,
+                hir::MethodImplItem(ref sig, _) => sig.unsafety == hir::Unsafety::Unsafe,
                 _ => false
             }
         },
         Some(ast_map::NodeItem(itm)) => {
             match itm.node {
-                ast::ItemFn(_, style, _, _, _, _) => match style {
-                    ast::Unsafety::Unsafe => true,
+                hir::ItemFn(_, style, _, _, _, _) => match style {
+                    hir::Unsafety::Unsafe => true,
                     _ => false,
                 },
                 _ => false,
